@@ -1,0 +1,42 @@
+module tb_full_adder;
+    logic a, b, cin;
+    logic sum, cout;
+    logic [1:0] expected_result; 
+    int error_count = 0;
+    full_adder uut (
+        .i_a(a),
+        .i_b(b),
+        .i_cin(cin),
+        .o_sum(sum),
+        .o_cout(cout)
+    );
+    initial begin
+        $shm_open("waves.shm");
+        $shm_probe("AS");
+        $display("==========================================================");
+        $display("    Exhaustive Self-Checking Testbench for Full Adder     ");
+        $display("==========================================================");
+        $display("Time\t A\t B\t Cin\t | Sum\t Cout\t | Exp Sum\t Exp Cout");
+        for (int i = 0; i < 8; i++) begin
+            {a, b, cin} = i;
+            #10;
+            expected_result = a + b + cin;
+            if ({cout, sum} !== expected_result) begin
+                $error("FAILED at %0t: Inputs=%b%b%b | Got {C,S}=%b%b | Expected=%b", 
+                        $time, a, b, cin, cout, sum, expected_result);
+                error_count++;
+            end else begin
+                // Optional: Print passing cases to see progress
+                $display("%0t\t %b\t %b\t %b\t | %b\t %b\t |    %b\t\t    %b", 
+                         $time, a, b, cin, sum, cout, expected_result[0], expected_result[1]);
+            end
+        end
+        $display("==========================================================");
+        if (error_count == 0)
+            $display("SIMULATION PASSED: Full Adder works perfectly!");
+        else
+            $display("SIMULATION FAILED: Found %0d errors.", error_count);
+        $display("==========================================================");
+        $stop;
+    end
+endmodule
