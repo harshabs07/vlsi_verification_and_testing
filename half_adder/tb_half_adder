@@ -1,0 +1,38 @@
+module tb_half_adder;
+    logic tb_a;
+    logic tb_b;
+    logic tb_sum;
+    logic tb_carry;
+    half_adder uut (
+        .i_a(tb_a),
+        .i_b(tb_b),
+        .o_sum(tb_sum),
+        .o_carry(tb_carry)
+    );
+    initial begin
+        $display("Time\t A\t B\t Sum\t Carry");
+        $monitor("%0t\t %b\t %b\t %b\t %b", $time, tb_a, tb_b, tb_sum, tb_carry);
+        tb_a = 0; tb_b = 0;
+        #10;
+        assert (tb_sum == 0 && tb_carry == 0) 
+            else $error("Failure at %0t: 0+0 failed. Got Sum=%b Carry=%b", $time, tb_sum, tb_carry);
+        tb_a = 0; tb_b = 1;
+        #10;
+        assert (tb_sum == 1 && tb_carry == 0) 
+            else $error("Failure at %0t: 0+1 failed. Got Sum=%b Carry=%b", $time, tb_sum, tb_carry);
+        tb_a = 1; tb_b = 0;
+        #10;
+        assert (tb_sum == 1 && tb_carry == 0) 
+            else $error("Failure at %0t: 1+0 failed. Got Sum=%b Carry=%b", $time, tb_sum, tb_carry);
+        tb_a = 1; tb_b = 1;
+        #10;
+        assert (tb_sum == 0 && tb_carry == 1) 
+            else $error("Failure at %0t: 1+1 failed. Got Sum=%b Carry=%b", $time, tb_sum, tb_carry);
+        $display("Simulation complete.");
+        $stop;
+    end
+    initial begin
+        $shm_open("waves.shm");
+        $shm_probe("AS");
+    end
+endmodule
