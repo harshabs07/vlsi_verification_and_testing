@@ -1,36 +1,36 @@
-module tb_full_adder;
-    logic a, b, cin;
-    logic sum, cout;
-    logic [1:0] expected_result;
+module tb_comparator;
+    logic a, b;
+    logic less, equal, greater;
+    logic [2:0] expected_result;
     int error_count = 0;
-    full_adder uut (
+    comparator uut (
         .i_a(a),
         .i_b(b),
-        .i_cin(cin),
-        .o_sum(sum),
-        .o_cout(cout)
+        .o_less(less),
+        .o_equal(equal),
+        .o_greater(greater)
     );
     initial begin
         $shm_open("waves.shm");
         $shm_probe("AS");
-        $display("Time\t A\t B\t Cin\t | Sum\t Cout\t | Exp Sum\t Exp Cout");
-        for (int i = 0; i < 8; i++) begin   
-            {a, b, cin} = i;
+        $display("Time\t A\t B\t | Less\t Eq\t Grt\t | Exp L\t Exp E\t Exp G");
+        for (int i = 0; i < 4; i++) begin      
+            {a, b} = i;
             #10;
-            expected_result = a + b + cin;
-            if ({cout, sum} !== expected_result) begin
-                $error("FAILED at %0t: Inputs=%b%b%b | Got {C,S}=%b%b | Expected=%b", 
-                        $time, a, b, cin, cout, sum, expected_result);
+            expected_result = { (a < b), (a == b), (a > b) };
+            if ({less, equal, greater} !== expected_result) begin
+                $error("FAILED at %0t: Inputs=%b%b | Got {L,E,G}=%b%b%b | Expected=%b", 
+                        $time, a, b, less, equal, greater, expected_result);
                 error_count++;
             end else begin
-                $display("%0t\t %b\t %b\t %b\t | %b\t %b\t |    %b\t\t    %b", 
-                         $time, a, b, cin, sum, cout, expected_result[0], expected_result[1]);
+                $display("%0t\t %b\t %b\t | %b\t %b\t %b\t |    %b\t    %b\t    %b", 
+                         $time, a, b, less, equal, greater, expected_result[2], expected_result[1], expected_result[0]);
             end
         end
         if (error_count == 0)
             $display("SIMULATION PASSED");
         else
-            $display("SIMULATION FAILED: Found %0d errors.", error_count);
+            $display("SIMULATION FAILED: Found %0d errors.", error_count);  
         $stop;
     end
 endmodule
