@@ -1,0 +1,7 @@
+module mux16x1(
+    input logic [15:0] i_data,  
+    input logic [3:0]  i_sel,   
+    output logic       o_y      
+);
+    assign o_y = i_data[i_sel];
+endmodule
