@@ -1,0 +1,201 @@
+interface fifo_intf(input logic clk, rst_n);
+  logic wr_en, rd_en;
+  logic full, empty;
+  logic [7:0] data_in;
+  logic [7:0] data_out;
+  clocking driver_cb @(posedge clk);
+    default input #1 output #1;
+    output wr_en, rd_en, data_in;
+    input  full, empty;
+  endclocking 
+  clocking monitor_cb @(posedge clk);
+    default input #1 output #1;
+    input wr_en, rd_en, data_in;
+    input data_out, full, empty;
+  endclocking
+endinterface
+class transaction;
+  rand bit wr_en;
+  rand bit rd_en;
+  rand bit [7:0] data_in;
+  bit [7:0] data_out; 
+  constraint dist_c {
+    wr_en dist { 0:=40, 1:=60 }; 
+    rd_en dist { 0:=40, 1:=60 };
+  }  
+  function void display(string tag);
+    $display("[%0t] [%s] WR=%0d RD=%0d DIN=%0h DOUT=%0h", 
+             $time, tag, wr_en, rd_en, data_in, data_out);
+  endfunction
+endclass
+class generator;
+  transaction trans;
+  mailbox #(transaction) gen2drv;
+  int repeat_count;
+  event ended;
+  function new(mailbox #(transaction) gen2drv);
+    this.gen2drv = gen2drv;
+  endfunction
+  task main();
+    repeat(repeat_count) begin
+      trans = new();
+      if(!trans.randomize()) $fatal("Gen::Randomization Failed");
+      gen2drv.put(trans);
+    end
+    -> ended;
+  endtask
+endclass
+class driver;
+  int no_transactions;
+  virtual fifo_intf vif;
+  mailbox #(transaction) gen2drv;
+  function new(virtual fifo_intf vif, mailbox #(transaction) gen2drv);
+    this.vif = vif;
+    this.gen2drv = gen2drv;
+    this.no_transactions = 0;
+  endfunction
+  task reset();
+    wait(!vif.rst_n);
+    $display("[DRIVER] Reset Started");
+    vif.driver_cb.wr_en   <= 0;
+    vif.driver_cb.rd_en   <= 0;
+    vif.driver_cb.data_in <= 0;
+    wait(vif.rst_n);
+    $display("[DRIVER] Reset Ended");
+  endtask
+  task main();
+    transaction trans;
+    forever begin
+      gen2drv.get(trans);
+      @(posedge vif.clk);
+      if(trans.wr_en && !vif.driver_cb.full) begin
+        vif.driver_cb.wr_en   <= 1;
+        vif.driver_cb.data_in <= trans.data_in;
+      end else begin 
+        vif.driver_cb.wr_en   <= 0;
+      end
+      if(trans.rd_en && !vif.driver_cb.empty) begin
+        vif.driver_cb.rd_en   <= 1;
+      end else begin
+        vif.driver_cb.rd_en   <= 0;
+      end 
+      @(posedge vif.clk);
+      vif.driver_cb.wr_en <= 0;
+      vif.driver_cb.rd_en <= 0;
+      trans.display("DRIVER");
+      no_transactions++;
+    end
+  endtask
+endclass
+class monitor;
+  virtual fifo_intf vif;
+  mailbox #(transaction) mon2scb;
+  function new(virtual fifo_intf vif, mailbox #(transaction) mon2scb);
+    this.vif = vif;
+    this.mon2scb = mon2scb;
+  endfunction
+  task main();
+    forever begin
+      @(posedge vif.clk);
+      #1;
+      if(vif.monitor_cb.wr_en && !vif.monitor_cb.full) begin
+         transaction t = new();
+         t.wr_en = 1; 
+         t.data_in = vif.monitor_cb.data_in;
+         t.display("MONITOR-WR");
+         mon2scb.put(t);
+      end
+      if(vif.monitor_cb.rd_en && !vif.monitor_cb.empty) begin
+         transaction t = new();
+         t.rd_en = 1;
+         @(posedge vif.clk); 
+         #1; 
+         t.data_out = vif.monitor_cb.data_out; 
+         mon2scb.put(t);
+         t.display("MONITOR-RD");
+      end
+    end
+  endtask
+endclass
+class scoreboard;
+  mailbox #(transaction) mon2scb;
+  bit [7:0] queue[$];
+  function new(mailbox #(transaction) mon2scb);
+    this.mon2scb = mon2scb;
+  endfunction
+  task main();
+    transaction trans;
+    forever begin
+      mon2scb.get(trans);
+      if(trans.wr_en) begin
+        queue.push_back(trans.data_in);
+        $display("[SCB] Pushed: %0h | Queue Size: %0d", trans.data_in, queue.size());
+      end 
+      if(trans.rd_en) begin
+        if(queue.size() == 0) 
+           $error("[SCB] Error: Read from Empty FIFO in Golden Model");
+        else begin
+           bit [7:0] exp = queue.pop_front();
+           if(trans.data_out !== exp) 
+              $error("[SCB] Mismatch! Exp:%0h Rec:%0h", exp, trans.data_out);
+           else 
+              $display("[SCB] Match: %0h | Queue Size: %0d", trans.data_out, queue.size());
+        end
+      end
+    end
+  endtask
+endclass
+class environment;
+  generator gen; 
+  driver driv; 
+  monitor mon; 
+  scoreboard scb;
+  mailbox #(transaction) gen2drv, mon2scb;
+  virtual fifo_intf vif;
+  function new(virtual fifo_intf vif);
+    this.vif = vif;
+    gen2drv = new(); 
+    mon2scb = new();
+    gen = new(gen2drv); 
+    driv = new(vif, gen2drv);
+    mon = new(vif, mon2scb); 
+    scb = new(mon2scb);
+  endfunction
+  task run();
+    driv.reset();
+    fork
+      gen.main(); 
+      driv.main(); 
+      mon.main(); 
+      scb.main();
+    join_any
+    wait(gen.ended.triggered);
+    wait(gen.repeat_count == driv.no_transactions);
+    #100; 
+    $finish;
+  endtask
+endclass
+`include "fifo.sv" 
+module tb_top;
+  bit clk, rst_n;
+  always #5 clk = ~clk;
+  fifo_intf intf(clk, rst_n);
+  fifo DUT (
+    .clk(intf.clk), .rst_n(intf.rst_n),
+    .wr_en(intf.wr_en), .rd_en(intf.rd_en),
+    .data_in(intf.data_in), .data_out(intf.data_out),
+    .full(intf.full), .empty(intf.empty)
+  );
+  environment env;
+  initial begin
+    clk = 0; rst_n = 0; 
+    #10 rst_n = 1;
+    env = new(intf);
+    env.gen.repeat_count = 100;
+    env.run();
+  end
+  initial begin
+    $dumpfile("dump.vcd");
+    $dumpvars;
+  end
+endmodule
