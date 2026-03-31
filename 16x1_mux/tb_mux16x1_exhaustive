@@ -1,0 +1,42 @@
+module tb_mux16x1_exhaustive;
+    logic [15:0] tb_data;
+    logic [3:0]  tb_sel;
+    logic        tb_y;
+    logic expected_y;
+    int error_count = 0;
+        int i; 
+    mux16x1 uut (
+        .i_data(tb_data),
+        .i_sel(tb_sel),
+        .o_y(tb_y)
+    );
+    initial begin
+        $shm_open("waves.shm");
+        $shm_probe("AS");
+        $display("===============================================================");
+        $display("    EXHAUSTIVE Self-Checking Testbench for 16x1 MUX           ");
+        $display("    Total Tests to Run: 1,048,576 (2^20 combinations)         ");
+        $display("===============================================================");
+                for (i = 0; i < 1048576; i++) begin
+            {tb_sel, tb_data} = i;
+            #10;
+            expected_y = tb_data[tb_sel];
+            if (tb_y !== expected_y) begin
+                $error("FAILED at %0t: Sel=%d Data=%h | Got=%b | Expected=%b", 
+                        $time, tb_sel, tb_data, tb_y, expected_y);
+                error_count++;
+            end 
+            else if (i % 50000 == 0) begin
+                $display("Time %0t: Checked %0d vectors... (Current Sel=%d)", 
+                         $time, i, tb_sel);
+            end
+        end
+        $display("===============================================================");
+        if (error_count == 0)
+            $display("SIMULATION PASSED: All 1,048,576 vectors verified!");
+        else
+            $display("SIMULATION FAILED: Found %0d errors.", error_count);
+        $display("===============================================================");
+        $stop;
+    end
+endmodule
