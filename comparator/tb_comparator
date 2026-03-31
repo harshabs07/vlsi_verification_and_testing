@@ -1,0 +1,40 @@
+module tb_comparator;
+    logic tb_a;
+    logic tb_b;
+    logic tb_less;
+    logic tb_equal;
+    logic tb_greater;
+    comparator uut (
+        .i_a(tb_a),
+        .i_b(tb_b),
+        .o_less(tb_less),
+        .o_equal(tb_equal),
+        .o_greater(tb_greater)
+    );
+    initial begin
+        $display("Time\t A\t B\t Less\t Equal\t Greater");
+        $monitor("%0t\t %b\t %b\t %b\t %b\t %b", $time, tb_a, tb_b, tb_less, tb_equal, tb_greater);
+        tb_a = 0; tb_b = 0;
+        #10;
+        assert (tb_equal == 1 && tb_less == 0 && tb_greater == 0) 
+            else $error("Failed 0 vs 0");
+        tb_a = 0; tb_b = 1;
+        #10;
+        assert (tb_equal == 0 && tb_less == 1 && tb_greater == 0) 
+            else $error("Failed 0 vs 1");
+        tb_a = 1; tb_b = 0;
+        #10;
+        assert (tb_equal == 0 && tb_less == 0 && tb_greater == 1) 
+            else $error("Failed 1 vs 0");
+        tb_a = 1; tb_b = 1;
+        #10;
+        assert (tb_equal == 1 && tb_less == 0 && tb_greater == 0) 
+            else $error("Failed 1 vs 1");
+        $display("Simulation complete.");
+        $stop;
+    end
+    initial begin
+        $shm_open("waves.shm");
+        $shm_probe("AS");
+    end
+endmodule
