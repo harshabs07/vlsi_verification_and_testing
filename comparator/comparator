@@ -1,0 +1,11 @@
+module comparator(
+    input logic i_a,
+    input logic i_b,
+    output logic o_less,    
+    output logic o_equal,   
+    output logic o_greater  
+);
+    assign o_less    = (~i_a) & i_b;
+    assign o_equal   = ~(i_a ^ i_b);
+    assign o_greater = i_a & (~i_b);
+endmodule
