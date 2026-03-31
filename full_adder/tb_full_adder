@@ -1,0 +1,48 @@
+module tb_full_adder;
+    logic tb_a;
+    logic tb_b;
+    logic tb_cin;
+    logic tb_sum;
+    logic tb_cout;
+    full_adder uut (
+        .i_a(tb_a),
+        .i_b(tb_b),
+        .i_cin(tb_cin),
+        .o_sum(tb_sum),
+        .o_cout(tb_cout)
+    );
+    initial begin
+        $display("Time\t A\t B\t Cin\t Sum\t Cout");
+        $monitor("%0t\t %b\t %b\t %b\t %b\t %b", $time, tb_a, tb_b, tb_cin, tb_sum, tb_cout);
+        tb_a = 0; tb_b = 0; tb_cin = 0;
+        #10;
+        assert (tb_sum == 0 && tb_cout == 0) else $error("Failed 000");
+        tb_a = 0; tb_b = 0; tb_cin = 1;
+        #10;
+        assert (tb_sum == 1 && tb_cout == 0) else $error("Failed 001");
+        tb_a = 0; tb_b = 1; tb_cin = 0;
+        #10;
+        assert (tb_sum == 1 && tb_cout == 0) else $error("Failed 010");
+        tb_a = 0; tb_b = 1; tb_cin = 1;
+        #10;
+        assert (tb_sum == 0 && tb_cout == 1) else $error("Failed 011");
+        tb_a = 1; tb_b = 0; tb_cin = 0;
+        #10;
+        assert (tb_sum == 1 && tb_cout == 0) else $error("Failed 100");
+        tb_a = 1; tb_b = 0; tb_cin = 1;
+        #10;
+        assert (tb_sum == 0 && tb_cout == 1) else $error("Failed 101");
+        tb_a = 1; tb_b = 1; tb_cin = 0;
+        #10;
+        assert (tb_sum == 0 && tb_cout == 1) else $error("Failed 110");
+        tb_a = 1; tb_b = 1; tb_cin = 1;
+        #10;
+        assert (tb_sum == 1 && tb_cout == 1) else $error("Failed 111");
+        $display("Simulation complete.");
+        $stop;
+    end
+    initial begin
+        $shm_open("waves.shm");
+        $shm_probe("AS");
+    end
+endmodule
