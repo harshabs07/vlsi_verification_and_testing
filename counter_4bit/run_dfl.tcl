@@ -1,4 +1,5 @@
 # genus -f run_dft.tcl
+# lec -nogui -dofile run_lec.do
 set_db / .init_lib_search_path ./
 set_db / .library { /opt/eda/cadence/FOUNDRY/digital/45nm/NangateOpenCellLibrary_v1.00_20080225/liberty/FreePDK45_lib_v1.0_typical_scan.lib }
 read_hdl -sv counter_4bit.sv
