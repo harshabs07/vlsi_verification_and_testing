@@ -1,13 +1,15 @@
-// -----------------------------------------------------------------------------
-// Module: 8-Bit Combinational Adder
-// Description: Standard 8-bit adder with carry-out for GitHub portfolio.
-// -----------------------------------------------------------------------------
-module adder8 (
-    input  logic [7:0] a,
-    input  logic [7:0] b,
-    output logic [7:0] sum,
-    output logic       cout
-);
-    // Concatenate cout and sum to handle the 9-bit result
-    assign {cout, sum} = a + b;
+interface adder_if;
+    logic [7:0] a;
+    logic [7:0] b;
+    logic [8:0] sum;
+endinterface
+
+`timescale 1ns/1ps
+module adder(
+    input logic [7:0] a,b,
+    output logic [8:0]sum);
+    always_comb begin
+    sum=a+b;
+    end
 endmodule
+
