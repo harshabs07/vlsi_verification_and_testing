@@ -1,142 +1,120 @@
-// -----------------------------------------------------------------------------
-// Testbench: Fully Layered OOP Testbench for 8-bit Adder
-// Architecture: Transaction -> Generator -> Driver -> Interface -> Monitor -> Scoreboard
-// -----------------------------------------------------------------------------
-
-// 1. Interface
-interface adder_if;
-    logic [7:0] a;
-    logic [7:0] b;
-    logic [7:0] sum;
-    logic       cout;
-endinterface
-
-// 2. Transaction Class
 class transaction;
     rand bit [7:0] a;
     rand bit [7:0] b;
-    bit  [7:0] sum;
-    bit        cout;
-    
+    bit [8:0] sum;
     function void display(string name);
-        $display("[%s] A: %0d | B: %0d | SUM: %0d | COUT: %0b", name, a, b, sum, cout);
+        $display("[%s] A=%d , B=%d , Sum=%d", name, a, b, sum);
     endfunction
 endclass
 
-// 3. Generator Class
+//`include "transaction.sv"
 class generator;
-    mailbox #(transaction) gen2drv;
-    int num_transactions;
-    event ended;
-
-    function new(mailbox #(transaction) g2d);
-        this.gen2drv = g2d;
+    transaction tr;
+    mailbox #(transaction) mbx;
+    int count=10;
+    function new(mailbox #(transaction) mbx);
+        this.mbx=mbx;
     endfunction
-
     task run();
-        transaction trans;
-        repeat(num_transactions) begin
-            trans = new();
-            if(!trans.randomize()) $fatal("Randomization failed!");
-            gen2drv.put(trans);
+        repeat(count) begin
+            tr=new();
+            assert(tr.randomize());
+            mbx.put(tr);
         end
-        -> ended;
     endtask
 endclass
 
-// 4. Driver Class
+//`include "transaction.sv"
 class driver;
     virtual adder_if vif;
-    mailbox #(transaction) gen2drv;
+    mailbox#(transaction) mbx;
+    transaction tr;
 
-    function new(virtual adder_if vif, mailbox #(transaction) g2d);
-        this.vif = vif;
-        this.gen2drv = g2d;
+    function new(virtual adder_if vif, mailbox #(transaction) mbx);
+        this.vif=vif;
+        this.mbx=mbx;
     endfunction
 
     task run();
-        transaction trans;
         forever begin
-            gen2drv.get(trans);
-            vif.a <= trans.a;
-            vif.b <= trans.b;
-            #10; // Allow combinational logic to settle
-            trans.display("DRIVER");
+            mbx.get(tr);
+            vif.a <= tr.a;
+            vif.b <= tr.b;
+            tr.display("DRV");
+            #10;
         end
     endtask
 endclass
 
-// 5. Monitor Class
+//`include "transaction.sv"
 class monitor;
     virtual adder_if vif;
-    mailbox #(transaction) mon2scb;
+    mailbox #(transaction) mbx;
+    transaction tr;
 
-    function new(virtual adder_if vif, mailbox #(transaction) m2s);
+    function new(virtual adder_if vif, mailbox #(transaction) mbx);
         this.vif = vif;
-        this.mon2scb = m2s;
+        this.mbx = mbx;
     endfunction
 
     task run();
-        transaction trans;
         forever begin
-            #10; // Sample after driver settles
-            trans = new();
-            trans.a    = vif.a;
-            trans.b    = vif.b;
-            trans.sum  = vif.sum;
-            trans.cout = vif.cout;
-            mon2scb.put(trans);
+            #5;
+            tr =new();
+            tr.a = vif.a;
+            tr.b = vif.b;
+            tr.sum = vif.sum;
+            mbx.put(tr);
+            #5;
         end
     endtask
 endclass
 
-// 6. Scoreboard Class
+//`include "transaction.sv"
 class scoreboard;
-    mailbox #(transaction) mon2scb;
-    int error_count = 0;
-
-    function new(mailbox #(transaction) m2s);
-        this.mon2scb = m2s;
+    mailbox #(transaction) mbx;
+    transaction tr;
+    function new(mailbox #(transaction) mbx);
+        this.mbx=mbx;
     endfunction
-
     task run();
-        transaction trans;
-        bit [8:0] expected_result;
-        
         forever begin
-            mon2scb.get(trans);
-            expected_result = trans.a + trans.b;
-            
-            if ({trans.cout, trans.sum} !== expected_result) begin
-                $error("[SCOREBOARD] Mismatch! Expected: %0d, Got: %0d", expected_result, {trans.cout, trans.sum});
-                error_count++;
+            mbx.get(tr);
+            if (tr.sum==(16'(tr.a) + tr.b)) begin
+                $display("[SCB] PASS",tr.a,tr.b,tr.sum);
             end else begin
-                $display("[SCOREBOARD] Match! A(%0d) + B(%0d) = %0d", trans.a, trans.b, {trans.cout, trans.sum});
+                $display("[SCB] FAIL",tr.a,tr.b,tr.sum,16'(tr.a) + tr.b);
             end
         end
     endtask
 endclass
 
-// 7. Environment Class
+`include "transaction.sv"
+`include "generator.sv"
+`include "scoreboard.sv"
+`include "driver.sv"
+`include "monitor.sv"
 class environment;
-    generator  gen;
-    driver     drv;
-    monitor    mon;
+    generator gen;
+    driver drv;
+    monitor mon;
     scoreboard scb;
-    mailbox #(transaction) gen2drv, mon2scb;
-    virtual adder_if vif;
 
+    mailbox #(transaction) gen2drv;
+    mailbox #(transaction) mon2scb;
+
+    virtual adder_if vif; //static (hardware)
     function new(virtual adder_if vif);
-        this.vif = vif;
-        gen2drv = new();
-        mon2scb = new();
-        gen = new(gen2drv);
-        drv = new(vif, gen2drv);
-        mon = new(vif, mon2scb);
-        scb = new(mon2scb);
-    endfunction
+        this.vif=vif;
+        gen2drv=new();
+        mon2scb=new();
 
-    task run();
+        gen=new(gen2drv);
+        drv=new(vif,gen2drv);
+        mon=new(vif,mon2scb);
+        scb=new(mon2scb);
+    endfunction
+    task test();
         fork
             gen.run();
             drv.run();
@@ -146,20 +124,20 @@ class environment;
     endtask
 endclass
 
-// 8. Top Module
-module tb_top;
-    adder_if vif();
-    adder8 DUT (.a(vif.a), .b(vif.b), .sum(vif.sum), .cout(vif.cout));
+`include "adder_if.sv"
+`include "environment.sv"
+module top_dut;
+    adder_if intf();
+    adder dut(
+        .a(intf.a),.b(intf.b),.sum(intf.sum)
+        );
     environment env;
-
     initial begin
-        env = new(vif);
-        env.gen.num_transactions = 20; // Run 20 random tests
-        env.run();
-        wait(env.gen.ended.triggered);
-        #20 $display("--- TEST COMPLETE ---");
-        if(env.scb.error_count == 0) $display("STATUS: PASS");
-        else $display("STATUS: FAIL (%0d errors)", env.scb.error_count);
+        env=new(intf);
+        env.gen.count=20;
+        env.test(); #100;
         $finish;
-    end
+        end
+
 endmodule
+
