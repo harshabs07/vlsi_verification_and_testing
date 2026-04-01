@@ -1,3 +1,4 @@
+xrun -64bit -sv full_tb.sv -access+rwc -gui
 module fifo #(
   parameter int DEPTH = 16,
   parameter int DATA_WIDTH = 8
