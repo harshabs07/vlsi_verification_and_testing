@@ -1,3 +1,17 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // --- Interface ---
 interface ram_intf #(parameter int DATA_WIDTH = 8, parameter int ADDR_WIDTH = 4) (input logic clk, rst);
     logic                we;
