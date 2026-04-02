@@ -1,3 +1,13 @@
+
+
+
+
+
+
+
+
+
+
 module sync_ram #(
     parameter int DATA_WIDTH = 8,
     parameter int DEPTH      = 16,
